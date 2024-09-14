@@ -1,3 +1,9 @@
+INSERT INTO users(ID, USER_NAME, PASSWORD, ROLE)
+VALUES (199, 'admin', '$2a$10$K5mH67Mk1.LJWvmxyQdHt.kkOfdtIFD2evSB2JurVHiBYaRNqmM8e', 'ADMIN');
+
+INSERT INTO users(ID, USER_NAME, PASSWORD, ROLE)
+VALUES (188, 'user', '$2a$10$D0w7RGRj.36qVznXxToDauL7qQ/h5/eHdVjONcMgUK.3MYRg8k7Z.', 'USER');
+
 INSERT INTO media_type(ID, NAME)
 VALUES (99, 'Game');
 

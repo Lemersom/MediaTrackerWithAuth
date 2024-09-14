@@ -1,8 +1,11 @@
 package com.example.mediatracker;
 
+import com.example.mediatracker.dto.AuthenticationRecordDto;
 import com.example.mediatracker.dto.MediaItemRecordDto;
 import com.example.mediatracker.dto.MediaTypeRecordDto;
+import com.example.mediatracker.dto.RegisterRecordDto;
 import com.example.mediatracker.enums.MediaStatus;
+import com.example.mediatracker.enums.UserRole;
 import com.jayway.jsonpath.DocumentContext;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.Test;
@@ -25,6 +28,53 @@ class MediaTrackerApplicationTests {
 
 	@Autowired
 	TestRestTemplate restTemplate;
+
+	// ---------- Authentication Tests ----------
+
+	@Test
+	void shouldLoginAUser() {
+		AuthenticationRecordDto authenticationDto = new AuthenticationRecordDto(
+				"user",
+				"user123");
+		ResponseEntity<Void> loginResponse = restTemplate
+				.postForEntity("/auth/login", authenticationDto, Void.class);
+		assertThat(loginResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+	}
+
+	@Test
+	void shouldNotLoginANInvalidUser() {
+		AuthenticationRecordDto authenticationDto = new AuthenticationRecordDto(
+				"user",
+				"user123456");
+		ResponseEntity<Void> loginResponse = restTemplate
+				.postForEntity("/auth/login", authenticationDto, Void.class);
+		assertThat(loginResponse.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+	}
+
+	@Test
+	@DirtiesContext
+	void shouldRegisterANewUser() {
+		RegisterRecordDto newRegisterDto = new RegisterRecordDto(
+				"test",
+				"test123",
+				UserRole.USER);
+		ResponseEntity<Void> registerResponse = restTemplate
+				.postForEntity("/auth/register", newRegisterDto, Void.class);
+		assertThat(registerResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+	}
+
+	@Test
+	@DirtiesContext
+	void shouldNotRegisterAnExistingUser() {
+		RegisterRecordDto newRegisterDto = new RegisterRecordDto(
+				"user",
+				"user123",
+				UserRole.USER);
+		ResponseEntity<Void> registerResponse = restTemplate
+				.postForEntity("/auth/register", newRegisterDto, Void.class);
+		assertThat(registerResponse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+	}
+
 
 	// ---------- Media Item Tests ----------
 
