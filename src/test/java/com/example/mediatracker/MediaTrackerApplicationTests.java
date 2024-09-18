@@ -1,21 +1,19 @@
 package com.example.mediatracker;
 
-import com.example.mediatracker.dto.AuthenticationRecordDto;
-import com.example.mediatracker.dto.MediaItemRecordDto;
-import com.example.mediatracker.dto.MediaTypeRecordDto;
-import com.example.mediatracker.dto.RegisterRecordDto;
+import com.example.mediatracker.dto.AuthenticationDTO;
+import com.example.mediatracker.dto.MediaItemDTO;
+import com.example.mediatracker.dto.MediaTypeDTO;
+import com.example.mediatracker.dto.RegisterDTO;
 import com.example.mediatracker.enums.MediaStatus;
 import com.example.mediatracker.enums.UserRole;
 import com.jayway.jsonpath.DocumentContext;
 import com.jayway.jsonpath.JsonPath;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.test.annotation.DirtiesContext;
 
 import java.net.URI;
@@ -27,23 +25,68 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MediaTrackerApplicationTests {
 
 	@Autowired
-	TestRestTemplate restTemplate;
+	private TestRestTemplate restTemplate;
+
+	private static String adminToken;
+	private static String userToken;
+
+	private HttpEntity<Void> createAdminHttpEntityGET() {
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + adminToken);
+
+		return new HttpEntity<>(headers);
+	}
+
+	private HttpEntity<Void> createUserHttpEntityGET() {
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + userToken);
+
+		return new HttpEntity<>(headers);
+	}
+
+	@BeforeAll
+    static void loginUsers(@Autowired TestRestTemplate restTemplate) {
+
+		AuthenticationDTO adminAuthenticationDto = new AuthenticationDTO(
+				"admin",
+				"admin123");
+		ResponseEntity<String> adminLoginResponse = restTemplate
+				.postForEntity("/auth/login", adminAuthenticationDto, String.class);
+
+		DocumentContext adminDocumentContext = JsonPath.parse(adminLoginResponse.getBody());
+		adminToken = adminDocumentContext.read("$.token");
+
+
+		AuthenticationDTO userAuthenticationDto = new AuthenticationDTO(
+				"user",
+				"user123");
+		ResponseEntity<String> userLoginResponse = restTemplate
+				.postForEntity("/auth/login", userAuthenticationDto, String.class);
+
+		DocumentContext userDocumentContext = JsonPath.parse(userLoginResponse.getBody());
+		userToken = userDocumentContext.read("$.token");
+	}
 
 	// ---------- Authentication Tests ----------
 
 	@Test
 	void shouldLoginAUser() {
-		AuthenticationRecordDto authenticationDto = new AuthenticationRecordDto(
+		AuthenticationDTO authenticationDto = new AuthenticationDTO(
 				"user",
 				"user123");
-		ResponseEntity<Void> loginResponse = restTemplate
-				.postForEntity("/auth/login", authenticationDto, Void.class);
+		ResponseEntity<String> loginResponse = restTemplate
+				.postForEntity("/auth/login", authenticationDto, String.class);
 		assertThat(loginResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+		DocumentContext documentContext = JsonPath.parse(loginResponse.getBody());
+
+		String token = documentContext.read("$.token");
+		assertThat(token).isNotNull();
 	}
 
 	@Test
-	void shouldNotLoginANInvalidUser() {
-		AuthenticationRecordDto authenticationDto = new AuthenticationRecordDto(
+	void shouldNotLoginAnInvalidUser() {
+		AuthenticationDTO authenticationDto = new AuthenticationDTO(
 				"user",
 				"user123456");
 		ResponseEntity<Void> loginResponse = restTemplate
@@ -54,7 +97,7 @@ class MediaTrackerApplicationTests {
 	@Test
 	@DirtiesContext
 	void shouldRegisterANewUser() {
-		RegisterRecordDto newRegisterDto = new RegisterRecordDto(
+		RegisterDTO newRegisterDto = new RegisterDTO(
 				"test",
 				"test123",
 				UserRole.USER);
@@ -64,9 +107,8 @@ class MediaTrackerApplicationTests {
 	}
 
 	@Test
-	@DirtiesContext
 	void shouldNotRegisterAnExistingUser() {
-		RegisterRecordDto newRegisterDto = new RegisterRecordDto(
+		RegisterDTO newRegisterDto = new RegisterDTO(
 				"user",
 				"user123",
 				UserRole.USER);
@@ -75,13 +117,132 @@ class MediaTrackerApplicationTests {
 		assertThat(registerResponse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
 	}
 
+	@Test
+	void userCannotCreateUpdateOrDeleteAMediaItem() {
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + userToken);
+		headers.setContentType(MediaType.APPLICATION_JSON);
+
+		MediaItemDTO newMediaItemDto = new MediaItemDTO(
+				"Avengers",
+				null,
+				null,
+				null,
+				MediaStatus.WISHLIST,
+				88L,
+				null);
+
+		HttpEntity<MediaItemDTO> requestEntityPost = new HttpEntity<>(newMediaItemDto, headers);
+
+		ResponseEntity<Void> createResponse = restTemplate
+				.postForEntity("/media-item", requestEntityPost, Void.class);
+		assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+
+		MediaItemDTO mediaItemDTOUpdate = new MediaItemDTO(
+				"Baldurs Gate 3",
+				10,
+				LocalDate.of(2023, 11, 20),
+				null,
+				MediaStatus.ON_HOLD,
+				99L,
+				null);
+
+		HttpEntity<MediaItemDTO> requestEntityPut = new HttpEntity<>(mediaItemDTOUpdate, headers);
+
+		ResponseEntity<Void> updateResponse = restTemplate
+				.exchange("/media-item/11", HttpMethod.PUT, requestEntityPut, Void.class);
+		assertThat(updateResponse.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+
+		HttpEntity<Void> requestEntityDelete = new HttpEntity<>(headers);
+
+		ResponseEntity<Void> deleteResponse = restTemplate
+				.exchange("/media-item/11", HttpMethod.DELETE, requestEntityDelete, Void.class);
+		assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+	}
+
+	@Test
+	void userCannotCreateUpdateOrDeleteAMediaType() {
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + userToken);
+		headers.setContentType(MediaType.APPLICATION_JSON);
+
+		MediaTypeDTO newMediaTypeDto = new MediaTypeDTO("Book");
+
+		HttpEntity<MediaTypeDTO> requestEntityPost = new HttpEntity<>(newMediaTypeDto, headers);
+
+		ResponseEntity<Void> createResponse = restTemplate
+				.exchange("/media-type", HttpMethod.POST, requestEntityPost, Void.class);
+		assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+
+		MediaTypeDTO mediaTypeDTOUpdate = new MediaTypeDTO("Movies and Series");
+
+		HttpEntity<MediaTypeDTO> requestEntityPut = new HttpEntity<>(mediaTypeDTOUpdate, headers);
+
+		ResponseEntity<Void> updateResponse = restTemplate
+				.exchange("/media-type/88", HttpMethod.PUT, requestEntityPut, Void.class);
+		assertThat(updateResponse.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+
+		HttpEntity<Void> requestEntityDelete = new HttpEntity<>(headers);
+
+		ResponseEntity<Void> deleteResponse = restTemplate
+				.exchange("/media-type/77", HttpMethod.DELETE, requestEntityDelete, Void.class);
+		assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+	}
+
+	@Test
+	void userShouldNotGetUser() {
+		ResponseEntity<String> getOneResponse = restTemplate
+				.exchange("/user/199", HttpMethod.GET, createUserHttpEntityGET(), String.class);
+		assertThat(getOneResponse.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+		ResponseEntity<String> getAllResponse = restTemplate
+				.exchange("/user", HttpMethod.GET, createUserHttpEntityGET(), String.class);
+		assertThat(getAllResponse.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+	}
+
+
+	// ---------- User Tests ----------
+
+	@Test
+	void shouldReturnOneUser() {
+		ResponseEntity<String> response = restTemplate
+				.exchange("/user/188", HttpMethod.GET, createAdminHttpEntityGET(), String.class);
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+		DocumentContext documentContext = JsonPath.parse(response.getBody());
+
+		Number id = documentContext.read("$.id");
+		assertThat(id).isEqualTo(188);
+
+		String userName = documentContext.read("$.userName");
+		assertThat(userName).isEqualTo("user");
+
+		String role = documentContext.read("$.role");
+		assertThat(role).isEqualTo("USER");
+	}
+
+	@Test
+	void shouldReturnAllUser() {
+		ResponseEntity<String> response = restTemplate
+				.exchange("/user", HttpMethod.GET, createAdminHttpEntityGET(), String.class);
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+		DocumentContext documentContext = JsonPath.parse(response.getBody());
+		int mediaItemCount = documentContext.read("$.length()");
+		assertThat(mediaItemCount).isEqualTo(2);
+	}
+
 
 	// ---------- Media Item Tests ----------
 
 	@Test
 	void shouldReturnOneMediaItem() {
 		ResponseEntity<String> response = restTemplate
-				.getForEntity("/media-item/25", String.class);
+				.exchange("/media-item/25", HttpMethod.GET, createUserHttpEntityGET(), String.class);
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
 		DocumentContext documentContext = JsonPath.parse(response.getBody());
@@ -117,7 +278,7 @@ class MediaTrackerApplicationTests {
 	@Test
 	void shouldReturnAllMediaItem() {
 		ResponseEntity<String> response = restTemplate
-				.getForEntity("/media-item", String.class);
+				.exchange("/media-item", HttpMethod.GET, createUserHttpEntityGET(), String.class);
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
 		DocumentContext documentContext = JsonPath.parse(response.getBody());
@@ -128,7 +289,7 @@ class MediaTrackerApplicationTests {
 	@Test
 	void shouldReturnAllMediaItemContainingTitle() {
 		ResponseEntity<String> response = restTemplate
-				.getForEntity("/media-item?title=portal", String.class);
+				.exchange("/media-item?title=portal", HttpMethod.GET, createUserHttpEntityGET(), String.class);
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
 		DocumentContext documentContext = JsonPath.parse(response.getBody());
@@ -139,7 +300,7 @@ class MediaTrackerApplicationTests {
 	@Test
 	void shouldReturnAllMediaItemWithGivenRating() {
 		ResponseEntity<String> response = restTemplate
-				.getForEntity("/media-item?rating=10", String.class);
+				.exchange("/media-item?rating=10", HttpMethod.GET, createUserHttpEntityGET(), String.class);
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
 		DocumentContext documentContext = JsonPath.parse(response.getBody());
@@ -150,7 +311,7 @@ class MediaTrackerApplicationTests {
 	@Test
 	void shouldReturnAllMediaItemWithGivenStatus() {
 		ResponseEntity<String> response = restTemplate
-				.getForEntity("/media-item?status=IN_PROGRESS", String.class);
+				.exchange("/media-item?status=IN_PROGRESS", HttpMethod.GET, createUserHttpEntityGET(), String.class);
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
 		DocumentContext documentContext = JsonPath.parse(response.getBody());
@@ -161,7 +322,7 @@ class MediaTrackerApplicationTests {
 	@Test
 	void shouldReturnAllMediaItemWithGivenMediaTypeId() {
 		ResponseEntity<String> response = restTemplate
-				.getForEntity("/media-item?mediaTypeId=99", String.class);
+				.exchange("/media-item?mediaTypeId=99", HttpMethod.GET, createUserHttpEntityGET(), String.class);
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
 		DocumentContext documentContext = JsonPath.parse(response.getBody());
@@ -172,7 +333,7 @@ class MediaTrackerApplicationTests {
 	@Test
 	void shouldReturnAllMediaItemWithGivenTitleRatingStatusMediaTypeId() {
 		ResponseEntity<String> response = restTemplate
-				.getForEntity("/media-item?title=portal&rating=10&status=COMPLETED&mediaTypeId=99", String.class);
+				.exchange("/media-item?title=portal&rating=10&status=COMPLETED&mediaTypeId=99", HttpMethod.GET, createUserHttpEntityGET(), String.class);
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
 		DocumentContext documentContext = JsonPath.parse(response.getBody());
@@ -183,7 +344,11 @@ class MediaTrackerApplicationTests {
 	@Test
 	@DirtiesContext
 	void shouldSaveANewMediaItem() {
-		MediaItemRecordDto newMediaItemDto = new MediaItemRecordDto(
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + adminToken);
+		headers.setContentType(MediaType.APPLICATION_JSON);
+
+		MediaItemDTO newMediaItemDto = new MediaItemDTO(
 				"Deadpool",
 				null,
 				null,
@@ -191,13 +356,16 @@ class MediaTrackerApplicationTests {
 				MediaStatus.WISHLIST,
 				88L,
 				null);
+
+		HttpEntity<MediaItemDTO> requestEntity = new HttpEntity<>(newMediaItemDto, headers);
+
 		ResponseEntity<Void> createResponse = restTemplate
-				.postForEntity("/media-item", newMediaItemDto, Void.class);
+				.postForEntity("/media-item", requestEntity, Void.class);
 		assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
 		URI locationOfNewMediaItem = createResponse.getHeaders().getLocation();
 		ResponseEntity<String> getResponse = restTemplate
-				.getForEntity(locationOfNewMediaItem, String.class);
+				.exchange(locationOfNewMediaItem, HttpMethod.GET, createAdminHttpEntityGET(), String.class);
 		assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
 
 		DocumentContext documentContext = JsonPath.parse(getResponse.getBody());
@@ -233,7 +401,11 @@ class MediaTrackerApplicationTests {
 	@Test
 	@DirtiesContext
 	void shouldUpdateAnExistingMediaItem() {
-		MediaItemRecordDto mediaItemRecordUpdate = new MediaItemRecordDto(
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + adminToken);
+		headers.setContentType(MediaType.APPLICATION_JSON);
+
+		MediaItemDTO mediaItemUpdateDto = new MediaItemDTO(
 				"Baldurs Gate 3",
 				10,
 				LocalDate.of(2024, 4, 29),
@@ -241,13 +413,15 @@ class MediaTrackerApplicationTests {
 				MediaStatus.COMPLETED,
 				99L,
 				null);
-		HttpEntity<MediaItemRecordDto> request = new HttpEntity<>(mediaItemRecordUpdate);
+
+		HttpEntity<MediaItemDTO> requestEntity = new HttpEntity<>(mediaItemUpdateDto, headers);
+
 		ResponseEntity<Void> updateResponse = restTemplate
-				.exchange("/media-item/11", HttpMethod.PUT, request, Void.class);
+				.exchange("/media-item/11", HttpMethod.PUT, requestEntity, Void.class);
 		assertThat(updateResponse.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
 		ResponseEntity<String> getResponse = restTemplate
-				.getForEntity("/media-item/11", String.class);
+				.exchange("/media-item/11", HttpMethod.GET, createAdminHttpEntityGET(), String.class);
 		assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
 
 		DocumentContext documentContext = JsonPath.parse(getResponse.getBody());
@@ -282,7 +456,11 @@ class MediaTrackerApplicationTests {
 
 	@Test
 	void shouldNotUpdateAMediaItemThatDoesNotExist() {
-		MediaItemRecordDto unknownMediaItem = new MediaItemRecordDto(
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + adminToken);
+		headers.setContentType(MediaType.APPLICATION_JSON);
+
+		MediaItemDTO unknownMediaItem = new MediaItemDTO(
 				"Unknown Game",
 				1,
 				null,
@@ -290,28 +468,38 @@ class MediaTrackerApplicationTests {
 				MediaStatus.COMPLETED,
 				1L,
 				null);
-		HttpEntity<MediaItemRecordDto> request = new HttpEntity<>(unknownMediaItem);
+
+		HttpEntity<MediaItemDTO> requestEntity = new HttpEntity<>(unknownMediaItem, headers);
+
 		ResponseEntity<Void> updateResponse = restTemplate
-				.exchange("/media-item/99999", HttpMethod.PUT, request, Void.class);
+				.exchange("/media-item/99999", HttpMethod.PUT, requestEntity, Void.class);
 		assertThat(updateResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
 	}
 
 	@Test
 	@DirtiesContext
 	void shouldDeleteAnExistingMediaItem() {
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + adminToken);
+		HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
+
 		ResponseEntity<Void> deleteResponse = restTemplate
-				.exchange("/media-item/11", HttpMethod.DELETE, null, Void.class);
+				.exchange("/media-item/11", HttpMethod.DELETE, requestEntity, Void.class);
 		assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
 		ResponseEntity<String> getResponse = restTemplate
-				.getForEntity("/media-item/11", String.class);
+				.exchange("/media-item/11", HttpMethod.GET, createAdminHttpEntityGET(), String.class);
 		assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
 	}
 
 	@Test
 	void shouldNotDeleteAMediaItemThatDoesNotExist() {
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + adminToken);
+		HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
+
 		ResponseEntity<Void> deleteResponse = restTemplate
-				.exchange("/media-item/99999", HttpMethod.DELETE, null, Void.class);
+				.exchange("/media-item/99999", HttpMethod.DELETE, requestEntity, Void.class);
 		assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
 	}
 
@@ -322,7 +510,7 @@ class MediaTrackerApplicationTests {
 	@Test
 	void shouldReturnOneMediaType() {
 		ResponseEntity<String> response = restTemplate
-				.getForEntity("/media-type/99", String.class);
+				.exchange("/media-type/99", HttpMethod.GET, createUserHttpEntityGET(), String.class);
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
 		DocumentContext documentContext = JsonPath.parse(response.getBody());
@@ -337,7 +525,7 @@ class MediaTrackerApplicationTests {
 	@Test
 	void shouldReturnAllMediaType() {
 		ResponseEntity<String> response = restTemplate
-				.getForEntity("/media-type", String.class);
+				.exchange("/media-type", HttpMethod.GET, createUserHttpEntityGET(), String.class);
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
 		DocumentContext documentContext = JsonPath.parse(response.getBody());
@@ -348,14 +536,21 @@ class MediaTrackerApplicationTests {
 	@Test
 	@DirtiesContext
 	void shouldSaveANewMediaType() {
-		MediaTypeRecordDto newMediaTypeDto = new MediaTypeRecordDto("Book");
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + adminToken);
+		headers.setContentType(MediaType.APPLICATION_JSON);
+
+		MediaTypeDTO newMediaTypeDto = new MediaTypeDTO("Book");
+
+		HttpEntity<MediaTypeDTO> requestEntity = new HttpEntity<>(newMediaTypeDto, headers);
+
 		ResponseEntity<Void> createResponse = restTemplate
-				.postForEntity("/media-type", newMediaTypeDto, Void.class);
+				.exchange("/media-type", HttpMethod.POST, requestEntity, Void.class);
 		assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
 		URI locationOfNewMediaType = createResponse.getHeaders().getLocation();
 		ResponseEntity<String> getResponse = restTemplate
-				.getForEntity(locationOfNewMediaType, String.class);
+				.exchange(locationOfNewMediaType, HttpMethod.GET, createAdminHttpEntityGET(), String.class);
 		assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
 
 		DocumentContext documentContext = JsonPath.parse(getResponse.getBody());
@@ -370,14 +565,20 @@ class MediaTrackerApplicationTests {
 	@Test
 	@DirtiesContext
 	void shouldUpdateAnExistingMediaType() {
-		MediaTypeRecordDto mediaTypeRecordUpdate = new MediaTypeRecordDto("Movies and Series");
-		HttpEntity<MediaTypeRecordDto> request = new HttpEntity<>(mediaTypeRecordUpdate);
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + adminToken);
+		headers.setContentType(MediaType.APPLICATION_JSON);
+
+		MediaTypeDTO mediaTypeUpdateDto = new MediaTypeDTO("Movies and Series");
+
+		HttpEntity<MediaTypeDTO> requestEntity = new HttpEntity<>(mediaTypeUpdateDto, headers);
+
 		ResponseEntity<Void> updateResponse = restTemplate
-				.exchange("/media-type/88", HttpMethod.PUT, request, Void.class);
+				.exchange("/media-type/88", HttpMethod.PUT, requestEntity, Void.class);
 		assertThat(updateResponse.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
 		ResponseEntity<String> getResponse = restTemplate
-				.getForEntity("/media-type/88", String.class);
+				.exchange("/media-type/88", HttpMethod.GET, createAdminHttpEntityGET(), String.class);
 		assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
 
 		DocumentContext documentContext = JsonPath.parse(getResponse.getBody());
@@ -391,36 +592,54 @@ class MediaTrackerApplicationTests {
 
 	@Test
 	void shouldNotUpdateAMediaTypeThatDoesNotExist() {
-		MediaTypeRecordDto unknownMediaType = new MediaTypeRecordDto("Unknown");
-		HttpEntity<MediaTypeRecordDto> request = new HttpEntity<>(unknownMediaType);
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + adminToken);
+		headers.setContentType(MediaType.APPLICATION_JSON);
+
+		MediaTypeDTO unknownMediaType = new MediaTypeDTO("Unknown");
+
+		HttpEntity<MediaTypeDTO> requestEntity = new HttpEntity<>(unknownMediaType, headers);
+
 		ResponseEntity<Void> updateResponse = restTemplate
-				.exchange("/media-type/99999", HttpMethod.PUT, request, Void.class);
+				.exchange("/media-type/99999", HttpMethod.PUT, requestEntity, Void.class);
 		assertThat(updateResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
 	}
 
 	@Test
 	@DirtiesContext
 	void shouldDeleteAnExistingMediaTypeWithNoMediaItem() {
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + adminToken);
+		HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
+
 		ResponseEntity<Void> deleteResponse = restTemplate
-				.exchange("/media-type/77", HttpMethod.DELETE, null, Void.class);
+				.exchange("/media-type/77", HttpMethod.DELETE, requestEntity, Void.class);
 		assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
 		ResponseEntity<String> getResponse = restTemplate
-				.getForEntity("/media-type/77", String.class);
+				.exchange("/media-type/77", HttpMethod.GET, createAdminHttpEntityGET(), String.class);
 		assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
 	}
 
 	@Test
 	void shouldNotDeleteAnExistingMediaTypeWithAnyMediaItem() {
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + adminToken);
+		HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
+
 		ResponseEntity<Void> deleteResponse = restTemplate
-				.exchange("/media-type/88", HttpMethod.DELETE, null, Void.class);
+				.exchange("/media-type/88", HttpMethod.DELETE, requestEntity, Void.class);
 		assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
 	}
 
 	@Test
 	void shouldNotDeleteAMediaTypeThatDoesNotExist() {
+		HttpHeaders headers = new HttpHeaders();
+		headers.set("Authorization", "Bearer " + adminToken);
+		HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
+
 		ResponseEntity<Void> deleteResponse = restTemplate
-				.exchange("/media-type/99999", HttpMethod.DELETE, null, Void.class);
+				.exchange("/media-type/99999", HttpMethod.DELETE, requestEntity, Void.class);
 		assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
 	}
 

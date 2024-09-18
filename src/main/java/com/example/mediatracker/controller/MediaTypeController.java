@@ -1,6 +1,6 @@
 package com.example.mediatracker.controller;
 
-import com.example.mediatracker.dto.MediaTypeRecordDto;
+import com.example.mediatracker.dto.MediaTypeDTO;
 import com.example.mediatracker.model.MediaTypeModel;
 import com.example.mediatracker.service.MediaTypeService;
 import jakarta.validation.Valid;
@@ -40,9 +40,9 @@ public class MediaTypeController {
     }
 
     @PostMapping
-    public ResponseEntity<Void> saveMediaType(@RequestBody MediaTypeRecordDto mediaTypeRecordDto,
+    public ResponseEntity<Void> saveMediaType(@RequestBody MediaTypeDTO mediaTypeDTO,
                                               UriComponentsBuilder ucb) {
-        MediaTypeModel savedMediaType = mediaTypeService.saveMediaType(mediaTypeRecordDto);
+        MediaTypeModel savedMediaType = mediaTypeService.saveMediaType(mediaTypeDTO);
 
         URI locationOfNewMediaType = ucb
                 .path("media-type/{id}")
@@ -53,8 +53,8 @@ public class MediaTypeController {
 
     @PutMapping("/{requestedId}")
     public ResponseEntity<Void> updateMediaType(@PathVariable Long requestedId,
-                                                @RequestBody @Valid MediaTypeRecordDto mediaTypeRecordDto) {
-        if(mediaTypeService.updateMediaType(requestedId, mediaTypeRecordDto)) {
+                                                @RequestBody @Valid MediaTypeDTO mediaTypeDTO) {
+        if(mediaTypeService.updateMediaType(requestedId, mediaTypeDTO)) {
             return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
         } else {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();

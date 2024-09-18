@@ -1,7 +1,7 @@
 package com.example.mediatracker.service;
 
 import com.example.mediatracker.controller.MediaItemController;
-import com.example.mediatracker.dto.MediaItemRecordDto;
+import com.example.mediatracker.dto.MediaItemDTO;
 import com.example.mediatracker.exception.ResourceNotFoundException;
 import com.example.mediatracker.model.MediaItemModel;
 import com.example.mediatracker.model.MediaTypeModel;
@@ -60,41 +60,41 @@ public class MediaItemService {
         return mediaItem;
     }
 
-    public MediaItemModel saveMediaItem(MediaItemRecordDto mediaItemRecordDto) {
-        Set<ConstraintViolation<MediaItemRecordDto>> violations = validator.validate(mediaItemRecordDto);
+    public MediaItemModel saveMediaItem(MediaItemDTO mediaItemDTO) {
+        Set<ConstraintViolation<MediaItemDTO>> violations = validator.validate(mediaItemDTO);
 
         if(!violations.isEmpty()) {
             StringBuilder sb = new StringBuilder();
-            for(ConstraintViolation<MediaItemRecordDto> constraintViolation : violations) {
+            for(ConstraintViolation<MediaItemDTO> constraintViolation : violations) {
                 sb.append(constraintViolation.getMessage()).append("; ");
             }
             sb.setLength(sb.length() - 2);
             throw new ConstraintViolationException("Error occurred: " + sb.toString(), violations);
         }
 
-        MediaTypeModel mediaType = mediaTypeRepository.findById(mediaItemRecordDto.mediaTypeId())
+        MediaTypeModel mediaType = mediaTypeRepository.findById(mediaItemDTO.mediaTypeId())
                 .orElseThrow(() -> new ResourceNotFoundException("Invalid media type ID"));
 
         MediaItemModel mediaItemToSave = new MediaItemModel();
-        BeanUtils.copyProperties(mediaItemRecordDto, mediaItemToSave);
+        BeanUtils.copyProperties(mediaItemDTO, mediaItemToSave);
 
         mediaItemToSave.setMediaType(mediaType);
 
         return mediaItemRepository.save(mediaItemToSave);
     }
 
-    public boolean updateMediaItem(Long requestedId, MediaItemRecordDto mediaItemRecordDto) {
+    public boolean updateMediaItem(Long requestedId, MediaItemDTO mediaItemDTO) {
         Optional<MediaItemModel> mediaItemToUpdate = mediaItemRepository.findById(requestedId);
         if(mediaItemToUpdate.isEmpty()) {
             return false;
         }
 
-        Optional<MediaTypeModel> mediaType = mediaTypeRepository.findById(mediaItemRecordDto.mediaTypeId());
+        Optional<MediaTypeModel> mediaType = mediaTypeRepository.findById(mediaItemDTO.mediaTypeId());
         if (mediaType.isEmpty()) {
-            throw new ResourceNotFoundException("Invalid media type id: " + mediaItemRecordDto.mediaTypeId());
+            throw new ResourceNotFoundException("Invalid media type id: " + mediaItemDTO.mediaTypeId());
         }
 
-        BeanUtils.copyProperties(mediaItemRecordDto, mediaItemToUpdate.get());
+        BeanUtils.copyProperties(mediaItemDTO, mediaItemToUpdate.get());
 
         mediaItemToUpdate.get().setMediaType(mediaType.get());
 

@@ -2,9 +2,9 @@ package com.example.mediatracker.dto;
 
 import com.example.mediatracker.enums.UserRole;
 
-public record RegisterRecordDto(
+public record UserResponseDTO(
+        Long id,
         String userName,
-        String password,
         UserRole role
 ) {
 }

@@ -1,6 +1,6 @@
 package com.example.mediatracker.dto;
 
-public record AuthenticationRecordDto(
+public record AuthenticationDTO(
         String userName,
         String password
 ) {

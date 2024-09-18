@@ -1,6 +1,6 @@
 package com.example.mediatracker.controller;
 
-import com.example.mediatracker.dto.MediaItemRecordDto;
+import com.example.mediatracker.dto.MediaItemDTO;
 import com.example.mediatracker.enums.MediaStatus;
 import com.example.mediatracker.model.MediaItemModel;
 import com.example.mediatracker.service.MediaItemService;
@@ -63,9 +63,9 @@ public class MediaItemController {
     }
 
     @PostMapping
-    public ResponseEntity<Void> saveMediaItem(@RequestBody MediaItemRecordDto mediaItemRecordDto,
+    public ResponseEntity<Void> saveMediaItem(@RequestBody MediaItemDTO mediaItemDTO,
                                          UriComponentsBuilder ucb) {
-        MediaItemModel savedMediaItem = mediaItemService.saveMediaItem(mediaItemRecordDto);
+        MediaItemModel savedMediaItem = mediaItemService.saveMediaItem(mediaItemDTO);
 
         URI locationOfNewMediaItem = ucb
                 .path("media-item/{id}")
@@ -76,8 +76,8 @@ public class MediaItemController {
 
     @PutMapping("/{requestedId}")
     public ResponseEntity<Void> updateMediaItem(@PathVariable Long requestedId,
-                                           @RequestBody @Valid MediaItemRecordDto mediaItemRecordDto) {
-        if(mediaItemService.updateMediaItem(requestedId, mediaItemRecordDto)) {
+                                           @RequestBody @Valid MediaItemDTO mediaItemDTO) {
+        if(mediaItemService.updateMediaItem(requestedId, mediaItemDTO)) {
             return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
         } else {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();

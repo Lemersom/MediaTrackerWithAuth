@@ -7,7 +7,7 @@ import org.hibernate.validator.constraints.Range;
 
 import java.time.LocalDate;
 
-public record MediaItemRecordDto(
+public record MediaItemDTO(
         @NotBlank(message = "Title must not be null or empty")
         String title,
         @Range(min = 1, max = 10, message = "Rating must be between 1 and 10")

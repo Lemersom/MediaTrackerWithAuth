@@ -1,7 +1,7 @@
 package com.example.mediatracker.service;
 
 import com.example.mediatracker.controller.MediaTypeController;
-import com.example.mediatracker.dto.MediaTypeRecordDto;
+import com.example.mediatracker.dto.MediaTypeDTO;
 import com.example.mediatracker.exception.ResourceNotFoundException;
 import com.example.mediatracker.model.MediaTypeModel;
 import com.example.mediatracker.repository.MediaItemRepository;
@@ -58,12 +58,12 @@ public class MediaTypeService {
         return mediaType;
     }
 
-    public MediaTypeModel saveMediaType(MediaTypeRecordDto mediaTypeRecordDto) {
-        Set<ConstraintViolation<MediaTypeRecordDto>> violations = validator.validate(mediaTypeRecordDto);
+    public MediaTypeModel saveMediaType(MediaTypeDTO mediaTypeDTO) {
+        Set<ConstraintViolation<MediaTypeDTO>> violations = validator.validate(mediaTypeDTO);
 
         if(!violations.isEmpty()) {
             StringBuilder sb = new StringBuilder();
-            for(ConstraintViolation<MediaTypeRecordDto> constraintViolation : violations) {
+            for(ConstraintViolation<MediaTypeDTO> constraintViolation : violations) {
                 sb.append(constraintViolation.getMessage()).append("; ");
             }
             sb.setLength(sb.length() - 2);
@@ -71,17 +71,17 @@ public class MediaTypeService {
         }
 
         MediaTypeModel mediaTypeToSave = new MediaTypeModel();
-        BeanUtils.copyProperties(mediaTypeRecordDto, mediaTypeToSave);
+        BeanUtils.copyProperties(mediaTypeDTO, mediaTypeToSave);
 
         return mediaTypeRepository.save(mediaTypeToSave);
     }
 
-    public boolean updateMediaType(Long requestedId, MediaTypeRecordDto mediaTypeRecordDto) {
+    public boolean updateMediaType(Long requestedId, MediaTypeDTO mediaTypeDTO) {
         Optional<MediaTypeModel> mediaTypeToUpdate = mediaTypeRepository.findById(requestedId);
         if(mediaTypeToUpdate.isEmpty()) {
             return false;
         }
-        BeanUtils.copyProperties(mediaTypeRecordDto, mediaTypeToUpdate.get());
+        BeanUtils.copyProperties(mediaTypeDTO, mediaTypeToUpdate.get());
         mediaTypeRepository.save(mediaTypeToUpdate.get());
 
         return true;
